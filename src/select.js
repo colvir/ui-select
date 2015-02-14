@@ -393,7 +393,7 @@
             if ( ctrl.taggingLabel === false ) {
               if ( ctrl.activeIndex < 0 ) {
                 item = ctrl.tagging.fct !== undefined ? ctrl.tagging.fct(ctrl.search) : ctrl.search;
-                if ( angular.equals( ctrl.items[0], item ) ) {
+                if (!item || angular.equals( ctrl.items[0], item ) ) {
                   return;
                 }
               } else {
@@ -412,6 +412,9 @@
                 // use tagging function if we have one
                 if ( ctrl.tagging.fct !== undefined && typeof item === 'string' ) {
                   item = ctrl.tagging.fct(ctrl.search);
+                  if (!item) {
+                    return;
+                  }
                 // if item type is 'string', apply the tagging label
                 } else if ( typeof item === 'string' ) {
                   // trim the trailing space
@@ -668,7 +671,9 @@
                 if ( ctrl.tagging.fct ) {
                   newItem = ctrl.tagging.fct( newItem );
                 }
-                ctrl.select( newItem, true);
+                if (newItem) {
+                  ctrl.select(newItem, true);
+                }
               });
             }
           }
@@ -728,11 +733,15 @@
             stashArr = stashArr.slice(1,stashArr.length);
           }
           newItem = ctrl.tagging.fct(ctrl.search);
-          newItem.isTag = true;
+          if (!newItem) {
+              return;
+          }
+
           // verify the the tag doesn't match the value of an existing item
           if ( stashArr.filter( function (origItem) { return angular.equals( origItem, ctrl.tagging.fct(ctrl.search) ); } ).length > 0 ) {
             return;
           }
+          newItem.isTag = true;
         // handle newItem string and stripping dupes in tagging string context
         } else {
           // find any tagging items already in the ctrl.items array and store them
