@@ -311,6 +311,21 @@ describe('ui-select tests', function() {
     });
   });
 
+  it('should allow decline tags when tagging function returns null', function() {
+    scope.taggingFunc = function (name) {
+      return null;
+    };
+
+    var el = createUiSelect({tagging: 'taggingFunc'});
+    clickMatch(el);
+
+    $(el).scope().$select.search = 'idontexist';
+    $(el).scope().$select.activeIndex = 0;
+    $(el).scope().$select.select('idontexist');
+
+    expect($(el).scope().$select.selected).not.toBeDefined();
+  });
+
   // See when an item that evaluates to false (such as "false" or "no") is selected, the placeholder is shown https://github.com/angular-ui/ui-select/pull/32
   it('should not display the placeholder when item evaluates to false', function() {
     scope.items = ['false'];
