@@ -15,7 +15,28 @@ describe('ui-select tests', function() {
     Escape: 27
   };
 
-  beforeEach(module('ngSanitize', 'ui.select'));
+  //create a directive that wraps ui-select
+  angular.module('wrapperDirective',['ui.select']);
+  angular.module('wrapperDirective').directive('wrapperUiSelect', function(){
+    return {
+      restrict: 'EA',
+      template: '<ui-select> \
+            <ui-select-match placeholder="Pick one...">{{$select.selected.name}}</ui-select-match> \
+            <ui-select-choices repeat="person in people | filter: $select.search"> \
+              <div ng-bind-html="person.name | highlight: $select.search"></div> \
+            </ui-select-choices> \
+          </ui-select>',
+      require: 'ngModel',
+      scope: true,
+
+      link: function (scope, element, attrs, ctrl) {
+
+      }
+    }
+
+  });
+
+  beforeEach(module('ngSanitize', 'ui.select', 'wrapperDirective'));
   beforeEach(inject(function(_$rootScope_, _$compile_, _$timeout_, _$injector_) {
     $rootScope = _$rootScope_;
     scope = $rootScope.$new();
@@ -85,7 +106,7 @@ describe('ui-select tests', function() {
   }
 
   function getMatchLabel(el) {
-    return $(el).find('.ui-select-match > button:first > span[ng-transclude]:not(.ng-hide)').text();
+    return $(el).find('.ui-select-match > span:first > span[ng-transclude]:not(.ng-hide)').text();
   }
 
   function clickItem(el, text) {
@@ -99,7 +120,7 @@ describe('ui-select tests', function() {
   }
 
   function clickMatch(el) {
-    $(el).find('.ui-select-match > button:first').click();
+    $(el).find('.ui-select-match > span:first').click();
     scope.$digest();
   }
 
@@ -184,6 +205,13 @@ describe('ui-select tests', function() {
     scope.selection.selected =  { name: 'Samantha',  email: 'something different than array source',  group: 'bar', age: 30 };
     scope.$digest();
     expect(getMatchLabel(el)).toEqual('Samantha');
+  });
+
+  it('should utilize wrapper directive ng-model', function() {
+    var el = compileTemplate('<wrapper-ui-select ng-model="selection.selected"/>');
+    scope.selection.selected =  { name: 'Samantha',  email: 'something different than array source',  group: 'bar', age: 30 };
+    scope.$digest();
+    expect($(el).find('.ui-select-container > .ui-select-match > span:first > span[ng-transclude]:not(.ng-hide)').text()).toEqual('Samantha');
   });
 
   it('should display the choices when activated', function() {
@@ -287,6 +315,21 @@ describe('ui-select tests', function() {
     expect(el3.scope().$select.disabled).toBeFalsy();
     clickMatch(el3);
     expect(isDropdownOpened(el3)).toEqual(true);
+  });
+
+  it('should allow decline tags when tagging function returns null', function() {
+    scope.taggingFunc = function (name) {
+      return null;
+    };
+
+    var el = createUiSelect({tagging: 'taggingFunc'});
+    clickMatch(el);
+
+    $(el).scope().$select.search = 'idontexist';
+    $(el).scope().$select.activeIndex = 0;
+    $(el).scope().$select.select('idontexist');
+
+    expect($(el).scope().$select.selected).not.toBeDefined();
   });
 
   it('should allow tagging if the attribute says so', function() {
