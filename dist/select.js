@@ -1,7 +1,7 @@
 /*!
  * ui-select
  * http://github.com/angular-ui/ui-select
- * Version: 0.11.2 - 2015-03-17T04:08:46.474Z
+ * Version: 0.11.2 - 2015-03-24T09:19:34.572Z
  * License: MIT
  */
 
@@ -540,7 +540,9 @@ uis.controller('uiSelectCtrl',
   ctrl.clear = function($event) {
     ctrl.select(undefined);
     $event.stopPropagation();
-    ctrl.focusser[0].focus();
+    $timeout(function() {
+      ctrl.focusser[0].focus();
+    }, 0, false);
   };
 
   // Toggle dropdown
@@ -1195,7 +1197,7 @@ uis.directive('uiSelectMultiple', ['uiSelectMinErr','$timeout', function(uiSelec
           if(KEY.isHorizontalMovement(key)){
             processed = _handleMatchSelection(key);
           }
-          if (processed  && key != KEY.TAB) {
+          if ((processed  && key != KEY.TAB) || (key == KEY.ENTER)) {
             //TODO Check si el tab selecciona aun correctamente
             //Crear test
             e.preventDefault();
