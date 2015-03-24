@@ -1,7 +1,7 @@
 /*!
  * ui-select
  * http://github.com/angular-ui/ui-select
- * Version: 0.11.1 - 2015-03-12T13:04:14.557Z
+ * Version: 0.11.2 - 2015-03-17T04:08:46.474Z
  * License: MIT
  */
 
@@ -893,62 +893,6 @@ uis.directive('uiSelect',
           $document.off('click', onDocumentClick);
         });
 
-        // Support for appending the select field to the body when its open
-        var appendToBody = scope.$eval(attrs.appendToBody);
-        if (appendToBody !== undefined ? appendToBody : uiSelectConfig.appendToBody) {
-          scope.$watch('$select.open', function(isOpen) {
-            if (isOpen) {
-              positionDropdown();
-            } else {
-              resetDropdown();
-            }
-          });
-
-          // Move the dropdown back to its original location when the scope is destroyed. Otherwise
-          // it might stick around when the user routes away or the select field is otherwise removed
-          scope.$on('$destroy', function() {
-            resetDropdown();
-          });
-        }
-
-        // Hold on to a reference to the .ui-select-container element for appendToBody support
-        var placeholder = null;
-
-        function positionDropdown() {
-          // Remember the absolute position of the element
-          var offset = uisOffset(element);
-
-          // Clone the element into a placeholder element to take its original place in the DOM
-          placeholder = angular.element('<div class="ui-select-placeholder"></div>');
-          placeholder[0].style.width = offset.width + 'px';
-          placeholder[0].style.height = offset.height + 'px';
-          element.after(placeholder);
-
-          // Now move the actual dropdown element to the end of the body
-          $document.find('body').append(element);
-
-          element[0].style.position = 'absolute';
-          element[0].style.left = offset.left + 'px';
-          element[0].style.top = offset.top + 'px';
-          element[0].style.width = offset.width + 'px';
-        }
-
-        function resetDropdown() {
-          if (placeholder === null) {
-            // The dropdown has not actually been display yet, so there's nothing to reset
-            return;
-          }
-
-          // Move the dropdown element back to its original location in the DOM
-          placeholder.replaceWith(element);
-          placeholder = null;
-
-          element[0].style.position = '';
-          element[0].style.left = '';
-          element[0].style.top = '';
-          element[0].style.width = '';
-        }
-
         // Move transcluded elements to their correct position in main template
         transcludeFn(scope, function(clone) {
           // See Transclude in AngularJS http://blog.omkarpatil.com/2012/11/transclude-in-angularjs.html
@@ -974,6 +918,67 @@ uis.directive('uiSelect',
           }
           element.querySelectorAll('.ui-select-choices').replaceWith(transcludedChoices);
         });
+
+        // Support for appending the select field to the body when its open
+        var appendToBody = scope.$eval(attrs.appendToBody);
+        if (appendToBody !== undefined ? appendToBody : uiSelectConfig.appendToBody) {
+          scope.$watch('$select.open', function(isOpen) {
+            if (isOpen) {
+              positionDropdown();
+            } else {
+              resetDropdown();
+            }
+          });
+
+          // Move the dropdown back to its original location when the scope is destroyed. Otherwise
+          // it might stick around when the user routes away or the select field is otherwise removed
+          scope.$on('$destroy', function() {
+            resetDropdown();
+          });
+        }
+
+        // Hold on to a reference to the .ui-select-container element for appendToBody support
+        var placeholder = null,
+            originalWidth = '';
+
+        function positionDropdown() {
+          // Remember the absolute position of the element
+          var offset = uisOffset(element);
+
+          // Clone the element into a placeholder element to take its original place in the DOM
+          placeholder = angular.element('<div class="ui-select-placeholder"></div>');
+          placeholder[0].style.width = offset.width + 'px';
+          placeholder[0].style.height = offset.height + 'px';
+          element.after(placeholder);
+
+          // Remember the original value of the element width inline style, so it can be restored
+          // when the dropdown is closed
+          originalWidth = element[0].style.width;
+
+          // Now move the actual dropdown element to the end of the body
+          $document.find('body').append(element);
+
+          element[0].style.position = 'absolute';
+          element[0].style.left = offset.left + 'px';
+          element[0].style.top = offset.top + 'px';
+          element[0].style.width = offset.width + 'px';
+        }
+
+        function resetDropdown() {
+          if (placeholder === null) {
+            // The dropdown has not actually been display yet, so there's nothing to reset
+            return;
+          }
+
+          // Move the dropdown element back to its original location in the DOM
+          placeholder.replaceWith(element);
+          placeholder = null;
+
+          element[0].style.position = '';
+          element[0].style.left = '';
+          element[0].style.top = '';
+          element[0].style.width = originalWidth;
+        }
       };
     }
   };
@@ -997,7 +1002,12 @@ uis.directive('uiSelectMatch', ['uiSelectConfig', function(uiSelectConfig) {
         $select.placeholder = placeholder !== undefined ? placeholder : uiSelectConfig.placeholder;
       });
 
-      $select.allowClear = (angular.isDefined(attrs.allowClear)) ? (attrs.allowClear === '') ? true : (attrs.allowClear.toLowerCase() === 'true') : false;
+      function setAllowClear(allow) {
+        $select.allowClear = (angular.isDefined(allow)) ? (allow === '') ? true : (allow.toLowerCase() === 'true') : false;
+      }
+
+      attrs.$observe('allowClear', setAllowClear);
+      setAllowClear(attrs.allowClear);
 
       if($select.multiple){
         $select.sizeSearchInput();
@@ -1014,10 +1024,27 @@ uis.directive('uiSelectMultiple', ['uiSelectMinErr','$timeout', function(uiSelec
 
     controller: ['$scope','$timeout', function($scope, $timeout){
 
-      var ctrl = this;
-      var $select = $scope.$select;
+      var ctrl = this,
+          $select = $scope.$select,
+          ngModel;
+
+      //Wait for link fn to inject it 
+      $scope.$evalAsync(function(){ ngModel = $scope.ngModel; });
 
       ctrl.activeMatchIndex = -1;
+
+      ctrl.updateModel = function(){
+        ngModel.$setViewValue(Date.now()); //Set timestamp as a unique string to force changes
+        ctrl.refreshComponent();
+      };
+
+      ctrl.refreshComponent = function(){
+        //Remove already selected items
+        //e.g. When user clicks on a selection, the selected array changes and 
+        //the dropdown should remove that item
+        $select.refreshItems();
+        $select.sizeSearchInput();
+      };
 
       // Remove item from multiple select
       ctrl.removeChoice = function(index){
@@ -1042,6 +1069,8 @@ uis.directive('uiSelectMultiple', ['uiSelectMinErr','$timeout', function(uiSelec
           });
         });
 
+        ctrl.updateModel();
+
       };
 
       ctrl.getPlaceholder = function(){
@@ -1057,8 +1086,10 @@ uis.directive('uiSelectMultiple', ['uiSelectMinErr','$timeout', function(uiSelec
     link: function(scope, element, attrs, ctrls) {
 
       var $select = ctrls[0];
-      var ngModel = ctrls[1];
+      var ngModel = scope.ngModel = ctrls[1];
       var $selectMultiple = scope.$selectMultiple;
+
+      //$select.selected = raw selected objects (ignoring any property binding)
 
       $select.multiple = true;
       $select.removeSelected = true;
@@ -1085,64 +1116,49 @@ uis.directive('uiSelectMultiple', ['uiSelectMinErr','$timeout', function(uiSelec
         var data = $select.parserResult.source (scope, { $select : {search:''}}), //Overwrite $search
             locals = {},
             result;
-        if (data){
-          var resultMultiple = [];
-          var checkFnMultiple = function(list, value){
-            if (!list || !list.length) return;
-            for (var p = list.length - 1; p >= 0; p--) {
-              locals[$select.parserResult.itemName] = list[p];
-              result = $select.parserResult.modelMapper(scope, locals);
-              if($select.parserResult.trackByExp){
-                  var matches = /\.(.+)/.exec($select.parserResult.trackByExp);
-                  if(matches.length>0 && result[matches[1]] == value[matches[1]]){
-                      resultMultiple.unshift(list[p]);
-                      return true;
-                  }
-              }
-              if (angular.equals(result,value)){
-                resultMultiple.unshift(list[p]);
-                return true;
-              }
+        if (!data) return inputValue;
+        var resultMultiple = [];
+        var checkFnMultiple = function(list, value){
+          if (!list || !list.length) return;
+          for (var p = list.length - 1; p >= 0; p--) {
+            locals[$select.parserResult.itemName] = list[p];
+            result = $select.parserResult.modelMapper(scope, locals);
+            if($select.parserResult.trackByExp){
+                var matches = /\.(.+)/.exec($select.parserResult.trackByExp);
+                if(matches.length>0 && result[matches[1]] == value[matches[1]]){
+                    resultMultiple.unshift(list[p]);
+                    return true;
+                }
             }
-            return false;
-          };
-          if (!inputValue) return resultMultiple; //If ngModel was undefined
-          for (var k = inputValue.length - 1; k >= 0; k--) {
-            //Check model array of currently selected items 
-            if (!checkFnMultiple($select.selected, inputValue[k])){
-              //Check model array of all items available
-              if (!checkFnMultiple(data, inputValue[k])){
-                //If not found on previous lists, just add it directly to resultMultiple
-                resultMultiple.unshift(inputValue[k]);
-              }
+            if (angular.equals(result,value)){
+              resultMultiple.unshift(list[p]);
+              return true;
             }
           }
-          return resultMultiple;
+          return false;
+        };
+        if (!inputValue) return resultMultiple; //If ngModel was undefined
+        for (var k = inputValue.length - 1; k >= 0; k--) {
+          //Check model array of currently selected items 
+          if (!checkFnMultiple($select.selected, inputValue[k])){
+            //Check model array of all items available
+            if (!checkFnMultiple(data, inputValue[k])){
+              //If not found on previous lists, just add it directly to resultMultiple
+              resultMultiple.unshift(inputValue[k]);
+            }
+          }
         }
-        return inputValue;
+        return resultMultiple;
       });
       
-      //Watch selection
+      //Watch for external model changes 
       scope.$watchCollection(function(){ return ngModel.$modelValue; }, function(newValue, oldValue) {
-        if (oldValue != newValue)
+        if (oldValue != newValue){
           ngModel.$modelValue = null; //Force scope model value and ngModel value to be out of sync to re-run formatters
-      });
-      //TODO Should be a better way to detect first pass
-      $select.firstPass = true; // so the form doesn't get dirty as soon as it loads
-      scope.$watchCollection('$select.selected', function() {
-        if (!$select.firstPass) {
-          ngModel.$setViewValue(Date.now()); //Set timestamp as a unique string to force changes
-        } else {
-          $select.firstPass = false;
+          $selectMultiple.refreshComponent();
         }
-        //Remove already selected items
-        //e.g. When user clicks on a selection, the selected array changes and 
-        //the dropdown should remove that item
-        $select.refreshItems();
-        //TODO Should add a test
-        $select.sizeSearchInput();
       });
-      
+
       ngModel.$render = function() {
         // Make sure that model value is array
         if(!angular.isArray(ngModel.$viewValue)){
@@ -1154,11 +1170,12 @@ uis.directive('uiSelectMultiple', ['uiSelectMinErr','$timeout', function(uiSelec
           }
         }
         $select.selected = ngModel.$viewValue;
+        scope.$evalAsync(); //To force $digest
       };
 
       scope.$on('uis:select', function (event, item) {
         $select.selected.push(item);
-        $select.sizeSearchInput();
+        $selectMultiple.updateModel();
       });
 
       scope.$on('uis:activate', function () {
@@ -1647,7 +1664,10 @@ uis.directive('uiSelectSort', ['$timeout', 'uiSelectConfig', 'uiSelectMinErr', f
         element.on('drop', dropHandler);
       });
 
-      element.on('dragleave', function() {
+      element.on('dragleave', function(e) {
+        if (e.target != element) {
+          return;
+        }
         element.removeClass(droppingClassName);
         element.removeClass(droppingBeforeClassName);
         element.removeClass(droppingAfterClassName);
