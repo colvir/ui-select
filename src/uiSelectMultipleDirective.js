@@ -176,7 +176,7 @@ uis.directive('uiSelectMultiple', ['uiSelectMinErr','$timeout', function(uiSelec
           if(KEY.isHorizontalMovement(key)){
             processed = _handleMatchSelection(key);
           }
-          if (processed  && key != KEY.TAB) {
+          if ((processed  && key != KEY.TAB) || (key == KEY.ENTER)) {
             //TODO Check si el tab selecciona aun correctamente
             //Crear test
             e.preventDefault();
