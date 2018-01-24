@@ -38,6 +38,7 @@ uis.directive('uiSelect',
 
         var $select = ctrls[0];
         var ngModel = ctrls[1];
+        var parentElement = attrs.parentElementSelector && scope[attrs.parentElementSelector] && angular.element(scope[attrs.parentElementSelector]);
 
         $select.generatedId = uiSelectConfig.generateId();
         $select.baseTitle = attrs.title || 'Select box';
@@ -59,6 +60,13 @@ uis.directive('uiSelect',
 
         $select.onSelectCallback = $parse(attrs.onSelect);
         $select.onRemoveCallback = $parse(attrs.onRemove);
+
+        $select.onUpdateSearchCallback = $parse(attrs.onUpdateSearch);
+
+        if(attrs.exportSearch){
+          $select.exportSearch = $parse(attrs.exportSearch);
+          if($select.exportSearch && !$select.exportSearch(scope)) $select.exportSearch.assign(scope, $select.searchInput);
+        }
 
         //Set reference to ngModel from uiSelectCtrl
         $select.ngModel = ngModel;
@@ -173,6 +181,15 @@ uis.directive('uiSelect',
               $timeout(function(){
                 $select.setFocus();
               });
+          });
+        }
+
+        //Hide based on scope event name (e.g. hide-on='SomeEventName')
+        if (angular.isDefined(attrs.hideOn)){
+          scope.$on(attrs.hideOn, function() {
+            $timeout(function(){
+              $select.setFocus();
+            });
           });
         }
 
@@ -381,16 +398,25 @@ uis.directive('uiSelect',
               var offset = uisOffset(element);
               var offsetDropdown = uisOffset(dropdown);
 
+              if (offset.top && !offsetDropdown.top) offsetDropdown.top = offset.top + offset.height; // при долгой отработке ангуляра не успевал просчитать offsetDropdown
+
               //https://code.google.com/p/chromium/issues/detail?id=342307#c4
-              var scrollTop = $document[0].documentElement.scrollTop || $document[0].body.scrollTop; //To make it cross browser (blink, webkit, IE, Firefox).
+              var offsetScroll;
+              if(parentElement && parentElement.length){
+                offsetScroll = parentElement[0].clientHeight;
+              } else {
+                offsetScroll = $document[0].documentElement.clientHeight + $document[0].documentElement.scrollTop || $document[0].body.scrollTop; //To make it cross browser (blink, webkit, IE, Firefox).
+              }
 
               // Determine if the direction of the dropdown needs to be changed.
-              if (offset.top + offset.height + offsetDropdown.height > scrollTop + $document[0].documentElement.clientHeight) {
+              if (offset.top + offset.height + offsetDropdown.height > offsetScroll) {
                 //Go UP
                 setDropdownPosUp(offset, offsetDropdown);
+                dropdown[0].style.maxHeight = offset.top + 'px';
               }else{
                 //Go DOWN
                 setDropdownPosDown(offset, offsetDropdown);
+                dropdown[0].style.maxHeight = !offsetDropdown.height ? '' : (offsetScroll - offsetDropdown.top) + 'px';
               }
             }
 
@@ -413,6 +439,9 @@ uis.directive('uiSelect',
            if ($select.search === '' && !opened) {
               dropdown[0].style.opacity = 0;
               opened = true;
+
+             //todo костыль для отображения dropdown, т.к. angular иногда не успевает просчитать св-во ng-show для этого элемента
+             if(window.getComputedStyle(dropdown[0]).display == 'none') dropdown[0].style.display = 'block';
            }
 
             if (!uisOffset(dropdown).height && $select.$animate && $select.$animate.on && $select.$animate.enabled(dropdown)) {
@@ -432,10 +461,13 @@ uis.directive('uiSelect',
               return;
             }
 
+            //todo хак для dropdown
+            dropdown[0].style.display = 'none';
             // Reset the position of the dropdown.
             dropdown[0].style.opacity = 0;
             dropdown[0].style.position = '';
             dropdown[0].style.top = '';
+            dropdown[0].style.maxHeight = '';
             element.removeClass(directionUpClassName);
           }
         };

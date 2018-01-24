@@ -147,6 +147,9 @@ uis.controller('uiSelectCtrl',
             $timeout(function () {
               ctrl.focusSearchInput(initSearchValue);
             });
+            $timeout(function () {
+              ctrl.searchInput[0].focus();
+            }, 200);
           }
         };
 
@@ -455,6 +458,7 @@ uis.controller('uiSelectCtrl',
   ctrl.close = function(skipFocusser) {
     if (!ctrl.open) return;
     if (ctrl.ngModel && ctrl.ngModel.$setTouched) ctrl.ngModel.$setTouched();
+    ctrl.onUpdateSearchCallback($scope, {$item: ctrl.search});
     ctrl.open = false;
     _resetSearchInput();
     $scope.$broadcast('uis:close', skipFocusser);
